@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HabitGrid</title>
+<style>
+body{font-family:system-ui,sans-serif;background:#0d1117;color:#e6edf3;margin:0;padding:20px;max-width:1000px;margin:auto}
+h1{margin:0 0 10px}form{display:flex;gap:8px;margin:12px 0}input,button,select{padding:8px;border-radius:6px;border:1px solid #30363d;background:#161b22;color:#e6edf3}
+button{cursor:pointer}button.primary{background:#238636;border-color:#238636}
+.habit{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:12px;margin:12px 0}
+.head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+.stats span{margin-right:14px;font-size:14px;color:#8b949e}.stats b{color:#e6edf3}
+.grid{display:grid;grid-template-rows:repeat(7,11px);grid-auto-flow:column;grid-auto-columns:11px;gap:3px;overflow-x:auto;margin-top:10px;padding-bottom:4px}
+.c{width:11px;height:11px;border-radius:2px;background:#21262d;cursor:pointer}.c.on{background:#39d353}.c.today{outline:1px solid #f0f6fc}.c.fut{visibility:hidden}
+.toolbar{display:flex;gap:8px;margin-top:8px}
+</style></head><body>
+<h1>HabitGrid</h1><p style="color:#8b949e">Track habits with a yearly heatmap. Click a square to toggle a day. Data stays in your browser.</p>
+<form id="f"><input id="name" placeholder="New habit (e.g. Read 20 min)" required maxlength="60"><button class="primary">Add habit</button></form>
+<div class="toolbar"><button id="exp">Export JSON</button><label><button type="button" onclick="imp.click()">Import JSON</button><input id="imp" type="file" accept=".json" hidden></label></div>
+<div id="list"></div>
+<script>
+const KEY='habitgrid.v1';let S=JSON.parse(localStorage.getItem(KEY)||'{"habits":[]}');
+const save=()=>{localStorage.setItem(KEY,JSON.stringify(S));render()};
+const ds=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const today=()=>{const d=new Date();d.setHours(0,0,0,0);return d};
+function streaks(h){const set=new Set(h.days);let cur=0,d=today();if(!set.has(ds(d)))d.setDate(d.getDate()-1);
+while(set.has(ds(d))){cur++;d.setDate(d.getDate()-1)}
+const s=[...set].sort();let best=0,run=0,prev=null;for(const x of s){const t=new Date(x+'T00:00');run=(prev&&(t-prev)/864e5===1)?run+1:1;best=Math.max(best,run);prev=t}
+const y=today();y.setDate(y.getDate()-364);const yr=s.filter(x=>new Date(x+'T00:00')>=y).length;return{cur,best,total:s.length,yr}}
+function render(){const L=document.getElementById('list');L.innerHTML='';
+if(!S.habits.length)L.innerHTML='<p style="color:#8b949e">No habits yet. Add one above.</p>';
+S.habits.forEach((h,i)=>{const st=streaks(h),el=document.createElement('div');el.className='habit';
+el.innerHTML=`<div class="head"><strong></strong><div><button data-a="t">Done today</button> <button data-a="r">Rename</button> <button data-a="d">Delete</button></div></div>
+<div class="stats"><span>Current streak <b>${st.cur}</b></span><span>Best streak <b>${st.best}</b></span><span>Last 365 days <b>${st.yr}</b></span><span>Total <b>${st.total}</b></span></div><div class="grid"></div>`;
+el.querySelector('strong').textContent=h.name;const g=el.querySelector('.grid'),set=new Set(h.days),t=today(),start=new Date(t);
+start.setDate(start.getDate()-364-start.getDay());
+for(let d=new Date(start);d<=t||d.getDay()!==0;d.setDate(d.getDate()+1)){const c=document.createElement('div'),k=ds(d);c.className='c';
+if(d>t)c.classList.add('fut');else{if(set.has(k))c.classList.add('on');if(k===ds(t))c.classList.add('today');c.title=k;c.onclick=()=>toggle(i,k)}g.appendChild(c)}
+el.querySelector('[data-a=t]').onclick=()=>toggle(i,ds(t));
+el.querySelector('[data-a=r]').onclick=()=>{const n=prompt('Rename habit',h.name);if(n){h.name=n.slice(0,60);save()}};
+el.querySelector('[data-a=d]').onclick=()=>{if(confirm('Delete "'+h.name+'"?')){S.habits.splice(i,1);save()}};
+L.appendChild(el);g.scrollLeft=g.scrollWidth})}
+function toggle(i,k){const h=S.habits[i],j=h.days.indexOf(k);j<0?h.days.push(k):h.days.splice(j,1);save()}
+document.getElementById('f').onsubmit=e=>{e.preventDefault();const n=document.getElementById('name');S.habits.push({name:n.value.trim(),days:[]});n.value='';save()};
+document.getElementById('exp').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,2)],{type:'application/json'}));a.download='habitgrid.json';a.click()};
+document.getElementById('imp').onchange=e=>{const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(Array.isArray(d.habits)){S=d;save()}else alert('Invalid file')}catch{alert('Invalid file')}};r.readAsText(e.target.files[0])};
+render();
+</script></body></html>
