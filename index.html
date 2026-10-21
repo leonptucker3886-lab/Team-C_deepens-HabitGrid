@@ -2,45 +2,88 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HabitGrid</title>
 <style>
-body{font-family:system-ui,sans-serif;background:#0d1117;color:#e6edf3;margin:0;padding:20px;max-width:1000px;margin:auto}
-h1{margin:0 0 10px}form{display:flex;gap:8px;margin:12px 0}input,button,select{padding:8px;border-radius:6px;border:1px solid #30363d;background:#161b22;color:#e6edf3}
-button{cursor:pointer}button.primary{background:#238636;border-color:#238636}
-.habit{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:12px;margin:12px 0}
-.head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
-.stats span{margin-right:14px;font-size:14px;color:#8b949e}.stats b{color:#e6edf3}
-.grid{display:grid;grid-template-rows:repeat(7,11px);grid-auto-flow:column;grid-auto-columns:11px;gap:3px;overflow-x:auto;margin-top:10px;padding-bottom:4px}
-.c{width:11px;height:11px;border-radius:2px;background:#21262d;cursor:pointer}.c.on{background:#39d353}.c.today{outline:1px solid #f0f6fc}.c.fut{visibility:hidden}
-.toolbar{display:flex;gap:8px;margin-top:8px}
+:root{--bg:#FAFAF9;--fg:#18181B;--card:#fff;--line:#DEDDD8;--mut:#6b6b70;--off:#ebebe7;--l1:#9be9a8;--l2:#40c463;--l3:#30a14e;--l4:#216e39;--acc:#2A78D6}
+body.dark{--bg:#0d1117;--fg:#e6edf3;--card:#161b22;--line:#30363d;--mut:#8b949e;--off:#21262d;--l1:#0e4429;--l2:#006d32;--l3:#26a641;--l4:#39d353}
+*{box-sizing:border-box}body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--fg);padding:16px;max-width:1000px;margin:auto}
+header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}h1{margin:0}
+input,button,select,textarea{font:inherit;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--fg)}
+button{cursor:pointer}button:hover{border-color:var(--acc)}.primary{background:var(--acc)!important;color:#fff!important}
+#f{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}#name{flex:1;min-width:180px}
+.habit,.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin:12px 0}
+.head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}small{color:var(--mut)}
+.stats{display:flex;flex-wrap:wrap;gap:14px;font-size:14px;color:var(--mut);margin-top:6px}.stats b{color:var(--fg)}
+.grid{display:grid;grid-template-rows:repeat(7,12px);grid-auto-flow:column;grid-auto-columns:12px;gap:3px;overflow-x:auto;margin-top:10px}
+.c{width:12px;height:12px;border-radius:3px;background:var(--off);cursor:pointer}.l1{background:var(--l1)}.l2{background:var(--l2)}.l3{background:var(--l3)}.l4{background:var(--l4)}
+.na{opacity:.35}.today{outline:2px solid var(--acc)}.fut{visibility:hidden}.note{box-shadow:inset 0 0 0 2px #f2c94c}.on{background:var(--l3);color:#fff}
+#summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}#summary .card{margin:0}.card b{display:block;font-size:24px}
+dialog{background:var(--card);color:var(--fg);border:1px solid var(--line);border-radius:12px;width:min(360px,90%)}.empty{color:var(--mut);text-align:center;padding:30px}
 </style></head><body>
-<h1>HabitGrid</h1><p style="color:#8b949e">Track habits with a yearly heatmap. Click a square to toggle a day. Data stays in your browser.</p>
-<form id="f"><input id="name" placeholder="New habit (e.g. Read 20 min)" required maxlength="60"><button class="primary">Add habit</button></form>
-<div class="toolbar"><button id="exp">Export JSON</button><label><button type="button" onclick="imp.click()">Import JSON</button><input id="imp" type="file" accept=".json" hidden></label></div>
+<header><h1>HabitGrid</h1><div><button id="theme">🌓</button> <button id="rem">🔔 Reminder</button> <button id="exp">Export</button> <button onclick="imp.click()">Import</button><input id="imp" type="file" accept=".json" hidden></div></header>
+<div id="summary"></div>
+<form id="f"><input id="name" placeholder="New habit (e.g. Read 20 min)" required maxlength="60">
+<select id="freq"><option value="daily">Every day</option><option value="days">Chosen days</option><option value="weekly">X times per week</option></select>
+<span id="dayp" hidden></span><input id="times" type="number" min="1" max="7" value="3" hidden style="width:70px">
+<button class="primary">Add habit</button></form>
 <div id="list"></div>
+<dialog id="dlg"><form method="dialog"><h3 id="dt"></h3><label><input type="checkbox" id="dd"> Done</label><p><textarea id="dn" rows="3" style="width:100%" placeholder="Note (optional)"></textarea></p><button value="ok" class="primary">Save</button> <button value="cancel">Cancel</button></form></dialog>
 <script>
-const KEY='habitgrid.v1';let S=JSON.parse(localStorage.getItem(KEY)||'{"habits":[]}');
+const KEY='habitgrid.v2',DN=['Su','Mo','Tu','We','Th','Fr','Sa'];
+let S=JSON.parse(localStorage.getItem(KEY)||'null');
+if(!S){const o=JSON.parse(localStorage.getItem('habitgrid.v1')||'{"habits":[]}');S={habits:o.habits.map(h=>({name:h.name,days:h.days||[],freq:'daily',on:[],times:7,notes:{}})),dark:matchMedia('(prefers-color-scheme: dark)').matches,remind:null}}
 const save=()=>{localStorage.setItem(KEY,JSON.stringify(S));render()};
 const ds=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 const today=()=>{const d=new Date();d.setHours(0,0,0,0);return d};
-function streaks(h){const set=new Set(h.days);let cur=0,d=today();if(!set.has(ds(d)))d.setDate(d.getDate()-1);
-while(set.has(ds(d))){cur++;d.setDate(d.getDate()-1)}
-const s=[...set].sort();let best=0,run=0,prev=null;for(const x of s){const t=new Date(x+'T00:00');run=(prev&&(t-prev)/864e5===1)?run+1:1;best=Math.max(best,run);prev=t}
-const y=today();y.setDate(y.getDate()-364);const yr=s.filter(x=>new Date(x+'T00:00')>=y).length;return{cur,best,total:s.length,yr}}
-function render(){const L=document.getElementById('list');L.innerHTML='';
-if(!S.habits.length)L.innerHTML='<p style="color:#8b949e">No habits yet. Add one above.</p>';
-S.habits.forEach((h,i)=>{const st=streaks(h),el=document.createElement('div');el.className='habit';
-el.innerHTML=`<div class="head"><strong></strong><div><button data-a="t">Done today</button> <button data-a="r">Rename</button> <button data-a="d">Delete</button></div></div>
-<div class="stats"><span>Current streak <b>${st.cur}</b></span><span>Best streak <b>${st.best}</b></span><span>Last 365 days <b>${st.yr}</b></span><span>Total <b>${st.total}</b></span></div><div class="grid"></div>`;
-el.querySelector('strong').textContent=h.name;const g=el.querySelector('.grid'),set=new Set(h.days),t=today(),start=new Date(t);
-start.setDate(start.getDate()-364-start.getDay());
-for(let d=new Date(start);d<=t||d.getDay()!==0;d.setDate(d.getDate()+1)){const c=document.createElement('div'),k=ds(d);c.className='c';
-if(d>t)c.classList.add('fut');else{if(set.has(k))c.classList.add('on');if(k===ds(t))c.classList.add('today');c.title=k;c.onclick=()=>toggle(i,k)}g.appendChild(c)}
-el.querySelector('[data-a=t]').onclick=()=>toggle(i,ds(t));
-el.querySelector('[data-a=r]').onclick=()=>{const n=prompt('Rename habit',h.name);if(n){h.name=n.slice(0,60);save()}};
-el.querySelector('[data-a=d]').onclick=()=>{if(confirm('Delete "'+h.name+'"?')){S.habits.splice(i,1);save()}};
-L.appendChild(el);g.scrollLeft=g.scrollWidth})}
+const pd=k=>new Date(k+'T00:00');
+const due=(h,d)=>h.freq!=='days'||h.on.includes(d.getDay());
+const wk=d=>{const x=new Date(d);x.setDate(x.getDate()-x.getDay());return ds(x)};
+function stats(h){const set=new Set(h.days),t=today(),tk=ds(t);let cur=0,best=0;
+ if(h.freq==='weekly'){const c={};h.days.forEach(k=>{const w=wk(pd(k));c[w]=(c[w]||0)+1});const ok=w=>(c[w]||0)>=h.times;
+  let d=pd(wk(t));if(!ok(ds(d)))d.setDate(d.getDate()-7);while(ok(ds(d))){cur++;d.setDate(d.getDate()-7)}
+  let run=0,prev=null;for(const w of Object.keys(c).sort()){if(!ok(w)){run=0;prev=null;continue}const x=pd(w);run=prev&&Math.round((x-prev)/864e5)===7?run+1:1;best=Math.max(best,run);prev=x}}
+ else{let d=new Date(t);if(!set.has(tk))d.setDate(d.getDate()-1);
+  for(let i=0;i<4000;i++){if(set.has(ds(d)))cur++;else if(due(h,d))break;d.setDate(d.getDate()-1)}
+  if(h.days.length){let run=0;for(let d=pd([...h.days].sort()[0]);d<=t;d.setDate(d.getDate()+1)){const k=ds(d);if(set.has(k)){run++;best=Math.max(best,run)}else if(due(h,d)&&k!==tk)run=0}}}
+ let dueN=0,doneN=0;const s=new Date(t);s.setDate(s.getDate()-29);
+ for(let d=new Date(s);d<=t;d.setDate(d.getDate()+1)){if(due(h,d))dueN++;if(set.has(ds(d)))doneN++}
+ const rate=h.freq==='weekly'?Math.min(100,Math.round(doneN/(h.times*30/7)*100)):dueN?Math.min(100,Math.round(doneN/dueN*100)):0;
+ const y=new Date(t);y.setDate(y.getDate()-364);
+ return{cur,best,rate,yr:h.days.filter(k=>pd(k)>=y).length,u:h.freq==='weekly'?' wk':' d'}}
+const label=h=>h.freq==='daily'?'Every day':h.freq==='days'?h.on.map(i=>DN[i]).join(' '):h.times+'× per week';
+function render(){document.body.classList.toggle('dark',!!S.dark);rem.textContent=S.remind?'🔔 '+S.remind:'🔔 Reminder';
+ const t=today(),tk=ds(t);list.innerHTML='';const all=S.habits.map(stats);
+ const dt=S.habits.filter(h=>due(h,t)),dn=dt.filter(h=>h.days.includes(tk)).length;
+ summary.innerHTML=S.habits.length?`<div class="card">Today<b>${dn}/${dt.length}</b></div><div class="card">30-day rate<b>${Math.round(all.reduce((a,s)=>a+s.rate,0)/all.length)}%</b></div><div class="card">Best streak<b>${Math.max(...all.map(s=>s.best))}</b></div><div class="card">Check-ins this year<b>${all.reduce((a,s)=>a+s.yr,0)}</b></div>`:'';
+ if(!S.habits.length)list.innerHTML='<p class="empty">No habits yet. Add your first one above.</p>';
+ S.habits.forEach((h,i)=>{const st=all[i],el=document.createElement('div'),set=new Set(h.days),on=set.has(tk);el.className='habit';
+  el.innerHTML=`<div class="head"><div><strong></strong> <small>${label(h)}</small></div><div><button class="${on?'on':''}" data-a="t">${on?'✓ Done today':'Mark today'}</button> <button data-a="u" title="Move up">↑</button> <button data-a="r">Rename</button> <button data-a="d">Delete</button></div></div><div class="stats"><span>Current streak <b>${st.cur}${st.u}</b></span><span>Best <b>${st.best}${st.u}</b></span><span>30-day rate <b>${st.rate}%</b></span><span>Last 365 days <b>${st.yr}</b></span></div><div class="grid"></div>`;
+  el.querySelector('strong').textContent=h.name;const g=el.querySelector('.grid'),start=new Date(t);start.setDate(start.getDate()-364-start.getDay());
+  for(let d=new Date(start);d<=t||d.getDay()!==0;d.setDate(d.getDate()+1)){const c=document.createElement('div'),k=ds(d);c.className='c';
+   if(d>t)c.classList.add('fut');else{if(set.has(k)){const p=new Date(d);let n=0;for(let j=0;j<4;j++){if(set.has(ds(p)))n++;p.setDate(p.getDate()-1)}c.classList.add('l'+n)}else if(!due(h,d))c.classList.add('na');
+    if(h.notes[k])c.classList.add('note');if(k===tk)c.classList.add('today');c.title=k+(h.notes[k]?' — '+h.notes[k]:'');c.onclick=()=>edit(i,k)}g.appendChild(c)}
+  el.querySelector('[data-a=t]').onclick=()=>toggle(i,tk);
+  el.querySelector('[data-a=u]').onclick=()=>{if(i){[S.habits[i-1],S.habits[i]]=[S.habits[i],S.habits[i-1]];save()}};
+  el.querySelector('[data-a=r]').onclick=()=>{const n=prompt('Rename habit',h.name);if(n&&n.trim()){h.name=n.trim().slice(0,60);save()}};
+  el.querySelector('[data-a=d]').onclick=()=>{if(confirm('Delete "'+h.name+'"?')){S.habits.splice(i,1);save()}};
+  list.appendChild(el);g.scrollLeft=g.scrollWidth})}
 function toggle(i,k){const h=S.habits[i],j=h.days.indexOf(k);j<0?h.days.push(k):h.days.splice(j,1);save()}
-document.getElementById('f').onsubmit=e=>{e.preventDefault();const n=document.getElementById('name');S.habits.push({name:n.value.trim(),days:[]});n.value='';save()};
-document.getElementById('exp').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,2)],{type:'application/json'}));a.download='habitgrid.json';a.click()};
-document.getElementById('imp').onchange=e=>{const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(Array.isArray(d.habits)){S=d;save()}else alert('Invalid file')}catch{alert('Invalid file')}};r.readAsText(e.target.files[0])};
+function edit(i,k){const h=S.habits[i];dt.textContent=h.name+' · '+k;dd.checked=h.days.includes(k);dn.value=h.notes[k]||'';
+ dlg.onclose=()=>{if(dlg.returnValue!=='ok')return;const has=h.days.includes(k);if(dd.checked!==has)toggle(i,k);
+  const v=dn.value.trim();if(v)h.notes[k]=v.slice(0,300);else delete h.notes[k];save()};dlg.returnValue='';dlg.showModal()}
+dayp.innerHTML=DN.map((n,i)=>`<label><input type="checkbox" value="${i}" ${i>0&&i<6?'checked':''}>${n}</label>`).join(' ');
+freq.onchange=()=>{dayp.hidden=freq.value!=='days';times.hidden=freq.value!=='weekly'};
+f.onsubmit=e=>{e.preventDefault();const on=[...dayp.querySelectorAll('input:checked')].map(x=>+x.value);
+ if(freq.value==='days'&&!on.length)return alert('Pick at least one day');
+ S.habits.push({name:name.value.trim(),days:[],freq:freq.value,on,times:Math.min(7,Math.max(1,+times.value||1)),notes:{}});name.value='';save()};
+theme.onclick=()=>{S.dark=!S.dark;save()};
+rem.onclick=async()=>{const v=prompt('Daily reminder time (HH:MM, 24h). Leave empty to turn off. Works while HabitGrid is open in a tab.',S.remind||'20:00');
+ if(v===null)return;if(v&&!/^([01]\d|2[0-3]):[0-5]\d$/.test(v))return alert('Use HH:MM, e.g. 20:00');
+ if(v&&'Notification'in window&&Notification.permission==='default')await Notification.requestPermission();S.remind=v||null;save()};
+let fired='';setInterval(()=>{if(!S.remind)return;const n=new Date(),hm=String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0'),k=ds(n);
+ if(hm===S.remind&&fired!==k){fired=k;const left=S.habits.filter(h=>due(h,today())&&!h.days.includes(k)).length;if(!left)return;
+  const msg=left+' habit'+(left>1?'s':'')+' left today';if('Notification'in window&&Notification.permission==='granted')new Notification('HabitGrid',{body:msg});else alert(msg)}},20000);
+exp.onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,2)],{type:'application/json'}));a.download='habitgrid-backup-'+ds(new Date())+'.json';a.click()};
+imp.onchange=e=>{const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!Array.isArray(d.habits))throw 0;
+ d.habits=d.habits.map(h=>({name:String(h.name||'Habit').slice(0,60),days:Array.isArray(h.days)?h.days.filter(x=>/^\d{4}-\d\d-\d\d$/.test(x)):[],freq:['daily','days','weekly'].includes(h.freq)?h.freq:'daily',on:h.on||[],times:h.times||7,notes:h.notes||{}}));
+ if(confirm('Replace current data with '+d.habits.length+' habits from the file?')){S={...S,...d};save()}}catch{alert('Invalid backup file')}};r.readAsText(e.target.files[0]);e.target.value=''};
 render();
 </script></body></html>
