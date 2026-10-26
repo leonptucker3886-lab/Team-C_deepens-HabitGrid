@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>HabitGrid</title>
+<title>HabitGrid: Habit Tracker with Yearly Heatmap</title><meta name="description" content="HabitGrid: track habits with a GitHub-style yearly heatmap, streaks, notes and reminders. No account, data stays in your browser."><meta property="og:title" content="HabitGrid"><meta property="og:description" content="Build streaks and watch your year fill in."><meta name="theme-color" content="#216e39"><link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🟩</text></svg>">
 <style>
 :root{--bg:#FAFAF9;--fg:#18181B;--card:#fff;--line:#DEDDD8;--mut:#6b6b70;--off:#ebebe7;--l1:#9be9a8;--l2:#40c463;--l3:#30a14e;--l4:#216e39;--acc:#2A78D6}
 body.dark{--bg:#0d1117;--fg:#e6edf3;--card:#161b22;--line:#30363d;--mut:#8b949e;--off:#21262d;--l1:#0e4429;--l2:#006d32;--l3:#26a641;--l4:#39d353}
@@ -26,6 +26,7 @@ dialog{background:var(--card);color:var(--fg);border:1px solid var(--line);borde
 <button class="primary">Add habit</button></form>
 <div id="list"></div>
 <dialog id="dlg"><form method="dialog"><h3 id="dt"></h3><label><input type="checkbox" id="dd"> Done</label><p><textarea id="dn" rows="3" style="width:100%" placeholder="Note (optional)"></textarea></p><button value="ok" class="primary">Save</button> <button value="cancel">Cancel</button></form></dialog>
+<footer style="text-align:center;color:var(--mut);font-size:13px;margin:24px 0">HabitGrid · $4.99 one-time · Your data stays on this device · <a href="https://www.leonlink.net" style="color:var(--acc)">LeonLink</a></footer>
 <script>
 const KEY='habitgrid.v2',DN=['Su','Mo','Tu','We','Th','Fr','Sa'];
 let S=JSON.parse(localStorage.getItem(KEY)||'null');
